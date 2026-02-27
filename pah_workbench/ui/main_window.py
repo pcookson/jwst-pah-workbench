@@ -40,7 +40,7 @@ class MainWindow(QMainWindow):
         self.settings_service = settings_service
         self.logger = logging_service.logger
 
-        self._files_by_path: dict[str, ImportedFile] = {}
+        self._imported_files: list[ImportedFile] = []
 
         self.project_explorer_dock = ProjectExplorerDock(self)
         self.inspector_dock = InspectorDock(self)
@@ -50,7 +50,7 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.inspector_dock)
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.logs_dock)
 
-        self.project_explorer_dock.file_selected.connect(self._on_file_selected)
+        self.project_explorer_dock.selected_file_changed.connect(self._on_file_selected)
         logging_service.text_handler.emitter.message.connect(self.logs_dock.append_log)
 
         self._setup_central_tabs()
@@ -105,25 +105,27 @@ class MainWindow(QMainWindow):
 
     def _register_paths(self, paths: list[str], source: str) -> None:
         imported = self.file_import_service.import_paths(paths)
+        changed = False
         for item in imported:
-            key = str(item.path)
-            if key in self._files_by_path:
+            if item in self._imported_files:
                 continue
-            self._files_by_path[key] = item
-            self.project_explorer_dock.add_imported_file(item)
+            self._imported_files.append(item)
+            changed = True
             self.logger.info("Imported FITS (%s): %s", source, item.path)
+
+        if changed:
+            self.project_explorer_dock.set_imported_files(self._imported_files)
 
         rejected = len(paths) - len(imported)
         if rejected > 0:
             self.logger.warning("Skipped %s invalid or unsupported file(s)", rejected)
 
-    def _on_file_selected(self, path: str) -> None:
-        selected = self._files_by_path.get(path)
+    def _on_file_selected(self, selected: ImportedFile | None) -> None:
         if selected is None:
             self.inspector_dock.set_placeholder()
             return
         self.inspector_dock.show_file(selected)
-        self.logger.info("Selected file: %s", Path(path).name)
+        self.logger.info("Selected file: %s", Path(selected.path).name)
 
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:
         if self._extract_fits_paths(event):

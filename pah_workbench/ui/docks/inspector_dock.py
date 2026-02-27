@@ -16,7 +16,7 @@ class InspectorDock(QDockWidget):
         self.set_placeholder()
 
     def set_placeholder(self) -> None:
-        self.text.setPlainText("Select an imported file to inspect metadata.")
+        self.text.setPlainText("Select an imported file...")
 
     def show_file(self, imported_file: ImportedFile) -> None:
         details = [
